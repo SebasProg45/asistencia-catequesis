@@ -6,14 +6,14 @@ require __DIR__ . '/includes/functions.php';
 $grupos = $pdo->query('SELECT * FROM grupos ORDER BY nombre')->fetchAll();
 
 $grupoFiltro = isset($_GET['grupo']) && $_GET['grupo'] !== '' ? (int) $_GET['grupo'] : null;
-$desde = $_GET['desde'] ?? '';
-$hasta = $_GET['hasta'] ?? '';
+$desde = campo($_GET, 'desde');
+$hasta = campo($_GET, 'hasta');
 
 $resumen = obtener_resumen_asistencia($pdo, $grupoFiltro, $desde ?: null, $hasta ?: null);
 
 // --- Orden de la tabla de sumatoria (en memoria, incluye el % calculado) ---
-$sortCol = $_GET['sort'] ?? 'ausencias';
-$sortDir = ($_GET['dir'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
+$sortCol = campo($_GET, 'sort', 'ausencias');
+$sortDir = campo($_GET, 'dir', 'desc') === 'asc' ? 'asc' : 'desc';
 $sortFns = [
     'catequizando' => fn($r) => mb_strtolower($r['nombres'] . ' ' . $r['apellidos']),
     'grupo' => fn($r) => mb_strtolower($r['grupo_nombre']),
@@ -24,6 +24,7 @@ $sortFns = [
     'ausencias' => fn($r) => (int) $r['ausencias'],
     'puntos' => fn($r) => (float) $r['puntos_totales'],
     'pct' => fn($r) => $r['total_sesiones'] > 0 ? $r['puntos_totales'] / $r['total_sesiones'] : -1,
+    'meta' => fn($r) => $r['meta_puntos'] > 0 ? $r['puntos_totales'] / $r['meta_puntos'] : -1,
 ];
 if (!isset($sortFns[$sortCol])) {
     $sortCol = 'ausencias';
@@ -39,8 +40,8 @@ usort($resumen, function ($a, $b) use ($sortFns, $sortCol, $sortDir) {
 });
 
 // --- Orden de la tabla de sesiones recientes (consulta SQL aparte) ---
-$ssortCol = $_GET['ssort'] ?? 'fecha';
-$ssortDir = ($_GET['sdir'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
+$ssortCol = campo($_GET, 'ssort', 'fecha');
+$ssortDir = campo($_GET, 'sdir', 'desc') === 'asc' ? 'asc' : 'desc';
 // Nombres de columna SIN prefijo: el ORDER BY externo opera sobre la subconsulta
 // "recientes", que ya expone fecha/tema/grupo_nombre sin los alias s./g. originales.
 $ssortColumns = [
@@ -107,7 +108,8 @@ require __DIR__ . '/includes/header.php';
 <div class="card">
     <h2>Sumatoria de puntos por catequizando</h2>
     <p class="muted">1 punto = misa y catequesis · 0.5 = solo catequesis o solo misa · 0 = no asistió.</p>
-    <table class="table">
+    <div class="table-wrap">
+    <table class="table table-resumen">
         <thead>
             <tr>
                 <th><?= sort_link('Catequizando', 'catequizando', $sortCol, $sortDir, $sortBase) ?></th>
@@ -119,6 +121,7 @@ require __DIR__ . '/includes/header.php';
                 <th><?= sort_link('No asistió', 'ausencias', $sortCol, $sortDir, $sortBase) ?></th>
                 <th><?= sort_link('Puntos', 'puntos', $sortCol, $sortDir, $sortBase) ?></th>
                 <th><?= sort_link('% Asistencia', 'pct', $sortCol, $sortDir, $sortBase) ?></th>
+                <th><?= sort_link('Meta de puntos', 'meta', $sortCol, $sortDir, $sortBase) ?></th>
             </tr>
         </thead>
         <tbody>
@@ -134,17 +137,20 @@ require __DIR__ . '/includes/header.php';
                 <td><span class="badge <?= $r['ausencias'] > 0 ? 'badge-off' : 'badge-ok' ?>"><?= (int) $r['ausencias'] ?></span></td>
                 <td><?= number_format((float) $r['puntos_totales'], 1) ?></td>
                 <td><?= $pct !== null ? $pct . '%' : '—' ?></td>
+                <td><?= barra_meta((float) $r['puntos_totales'], $r['meta_puntos'] !== null ? (float) $r['meta_puntos'] : null) ?></td>
             </tr>
         <?php endforeach; ?>
         <?php if (!$resumen): ?>
-            <tr><td colspan="9" class="empty">No hay datos para los filtros seleccionados.</td></tr>
+            <tr><td colspan="10" class="empty">No hay datos para los filtros seleccionados.</td></tr>
         <?php endif; ?>
         </tbody>
     </table>
+    </div>
 </div>
 
 <div class="card">
     <h2>Sesiones recientes</h2>
+    <div class="table-wrap">
     <table class="table">
         <thead><tr>
             <th><?= sort_link('Fecha', 'fecha', $ssortCol, $ssortDir, $sortBase, 'ssort', 'sdir') ?></th>
@@ -166,5 +172,6 @@ require __DIR__ . '/includes/header.php';
         <?php endif; ?>
         </tbody>
     </table>
+    </div>
 </div>
 <?php require __DIR__ . '/includes/footer.php'; ?>

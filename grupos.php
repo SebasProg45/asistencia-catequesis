@@ -7,22 +7,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $accion = $_POST['accion'] ?? '';
 
     if ($accion === 'crear' || $accion === 'editar') {
-        $nombre = trim($_POST['nombre'] ?? '');
-        $descripcion = trim($_POST['descripcion'] ?? '');
-        $dia_semana = trim($_POST['dia_semana'] ?? '');
+        $nombre = campo($_POST, 'nombre');
+        $descripcion = campo($_POST, 'descripcion');
+        $dia_semana = campo($_POST, 'dia_semana');
+        $metaRaw = str_replace(',', '.', campo($_POST, 'meta_puntos'));
+        $meta = ($metaRaw !== '' && is_numeric($metaRaw) && $metaRaw > 0) ? min(999.9, round((float) $metaRaw, 1)) : null;
 
         if ($nombre === '') {
             set_flash('error', 'El nombre del grupo es obligatorio.');
         } else {
             try {
                 if ($accion === 'crear') {
-                    $stmt = $pdo->prepare('INSERT INTO grupos (nombre, descripcion, dia_semana) VALUES (?, ?, ?)');
-                    $stmt->execute([$nombre, $descripcion ?: null, $dia_semana ?: null]);
+                    $stmt = $pdo->prepare('INSERT INTO grupos (nombre, descripcion, dia_semana, meta_puntos) VALUES (?, ?, ?, ?)');
+                    $stmt->execute([$nombre, $descripcion ?: null, $dia_semana ?: null, $meta]);
                     set_flash('success', 'Grupo creado correctamente.');
                 } else {
                     $id = (int) ($_POST['id'] ?? 0);
-                    $stmt = $pdo->prepare('UPDATE grupos SET nombre = ?, descripcion = ?, dia_semana = ? WHERE id = ?');
-                    $stmt->execute([$nombre, $descripcion ?: null, $dia_semana ?: null, $id]);
+                    $stmt = $pdo->prepare('UPDATE grupos SET nombre = ?, descripcion = ?, dia_semana = ?, meta_puntos = ? WHERE id = ?');
+                    $stmt->execute([$nombre, $descripcion ?: null, $dia_semana ?: null, $meta, $id]);
                     set_flash('success', 'Grupo actualizado.');
                 }
             } catch (PDOException $e) {
@@ -41,8 +43,8 @@ if (!empty($_GET['editar'])) {
     $editando = $stmt->fetch() ?: null;
 }
 
-$sortCol = $_GET['sort'] ?? 'nombre';
-$sortDir = ($_GET['dir'] ?? 'asc') === 'desc' ? 'desc' : 'asc';
+$sortCol = campo($_GET, 'sort', 'nombre');
+$sortDir = campo($_GET, 'dir', 'asc') === 'desc' ? 'desc' : 'asc';
 $sortColumns = [
     'nombre' => 'g.nombre',
     'dia' => 'g.dia_semana',
@@ -77,6 +79,7 @@ require __DIR__ . '/includes/header.php';
     <?php if ($editando): ?><input type="hidden" name="id" value="<?= (int) $editando['id'] ?>"><?php endif; ?>
     <label>Nombre <input type="text" name="nombre" required placeholder="Ej: Primera Comunión Nivel 1" value="<?= e($editando['nombre'] ?? '') ?>"></label>
     <label>Día <input type="text" name="dia_semana" placeholder="Sábado" value="<?= e($editando['dia_semana'] ?? '') ?>"></label>
+    <label>Meta de puntos <input type="text" name="meta_puntos" size="6" placeholder="Ej: 30" value="<?= e(fmt_num($editando['meta_puntos'] ?? null)) ?>"></label>
     <label>Descripción <input type="text" name="descripcion" placeholder="Opcional" value="<?= e($editando['descripcion'] ?? '') ?>"></label>
     <button class="btn btn-primary" type="submit"><?= $editando ? 'Actualizar' : 'Guardar' ?></button>
     <?php if ($editando): ?><a class="btn btn-muted" href="grupos.php">Cancelar</a><?php endif; ?>
@@ -89,6 +92,7 @@ require __DIR__ . '/includes/header.php';
             <th><?= sort_link('Nombre', 'nombre', $sortCol, $sortDir, []) ?></th>
             <th><?= sort_link('Día', 'dia', $sortCol, $sortDir, []) ?></th>
             <th><?= sort_link('Descripción', 'descripcion', $sortCol, $sortDir, []) ?></th>
+            <th>Meta de puntos</th>
             <th><?= sort_link('Catequizandos', 'catequizandos', $sortCol, $sortDir, []) ?></th>
             <th></th>
         </tr>
@@ -99,6 +103,7 @@ require __DIR__ . '/includes/header.php';
             <td><?= e($g['nombre']) ?></td>
             <td><?= e($g['dia_semana']) ?></td>
             <td><?= e($g['descripcion']) ?></td>
+            <td><?= $g['meta_puntos'] !== null ? fmt_num($g['meta_puntos']) : '—' ?></td>
             <td><?= (int) $g['total_estudiantes'] ?></td>
             <td class="actions">
                 <a class="btn btn-small" href="grupos.php?editar=<?= (int) $g['id'] ?>">Editar</a>
@@ -106,7 +111,7 @@ require __DIR__ . '/includes/header.php';
         </tr>
         <?php endforeach; ?>
         <?php if (!$grupos): ?>
-            <tr><td colspan="5" class="empty">Aún no hay grupos. Crea el primero arriba.</td></tr>
+            <tr><td colspan="6" class="empty">Aún no hay grupos. Crea el primero arriba.</td></tr>
         <?php endif; ?>
     </tbody>
 </table>

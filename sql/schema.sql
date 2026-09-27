@@ -12,8 +12,19 @@ CREATE TABLE grupos (
   nombre VARCHAR(100) NOT NULL,
   descripcion VARCHAR(255) NULL,
   dia_semana VARCHAR(20) NULL,
+  meta_puntos DECIMAL(5,1) NULL, -- puntos mínimos a alcanzar (ej. para el sacramento); NULL = sin meta
   creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
+
+-- Ajustes del sistema (umbrales de alertas, código de país para WhatsApp)
+CREATE TABLE configuracion (
+  clave VARCHAR(50) PRIMARY KEY,
+  valor VARCHAR(100) NOT NULL
+) ENGINE=InnoDB;
+INSERT INTO configuracion (clave, valor) VALUES
+('alerta_racha', '3'),        -- sábados seguidos sin asistir para disparar la alerta
+('alerta_porcentaje', '60'),  -- % de asistencia por debajo del cual se alerta
+('codigo_pais', '507');       -- prefijo para los links de WhatsApp
 
 -- Catequizandos (estudiantes)
 CREATE TABLE estudiantes (

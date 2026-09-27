@@ -5,8 +5,8 @@ require __DIR__ . '/includes/functions.php';
 require __DIR__ . '/includes/xlsx.php';
 
 $grupoFiltro = isset($_GET['grupo']) && $_GET['grupo'] !== '' ? (int) $_GET['grupo'] : null;
-$desde = $_GET['desde'] ?? '';
-$hasta = $_GET['hasta'] ?? '';
+$desde = campo($_GET, 'desde');
+$hasta = campo($_GET, 'hasta');
 
 $resumen = obtener_resumen_asistencia($pdo, $grupoFiltro, $desde ?: null, $hasta ?: null);
 $actividadesPorEstudiante = obtener_resumen_actividades($pdo, $grupoFiltro, $desde ?: null, $hasta ?: null);
@@ -19,6 +19,7 @@ usort($resumen, function ($a, $b) {
 
 $encabezados = [
     'Nombres', 'Apellidos', 'Grupo', 'Sesiones', 'Misa y Catequesis', 'Solo Catequesis', 'Solo Misa', 'No asistió', 'Puntos', '% Asistencia',
+    'Meta de puntos', '% de la meta',
     'Actividades asistidas', 'Total actividades',
 ];
 
@@ -37,6 +38,8 @@ foreach ($resumen as $r) {
         (int) $r['ausencias'],
         number_format((float) $r['puntos_totales'], 1),
         $pct !== '' ? $pct . '%' : '',
+        $r['meta_puntos'] !== null ? (float) $r['meta_puntos'] : '',
+        ($r['meta_puntos'] !== null && $r['meta_puntos'] > 0) ? round(($r['puntos_totales'] / $r['meta_puntos']) * 100) . '%' : '',
         (int) $act['actividades_asistidas'],
         (int) $act['total_actividades'],
     ];

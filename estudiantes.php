@@ -3,16 +3,25 @@ require __DIR__ . '/includes/auth.php';
 require __DIR__ . '/config/db.php';
 require __DIR__ . '/includes/functions.php';
 
+// El estado de la vista (filtro, búsqueda, orden) vive en la URL; se conserva tras guardar.
+// Se valida contra una lista de caracteres permitidos: "volver_a" llega en un campo oculto
+// del formulario y, sin esto, cualquiera podría enviar un POST con un valor arbitrario ahí.
+function volver_seguro(): string
+{
+    $v = $_POST['volver_a'] ?? '';
+    return is_string($v) && preg_match('/^\?[A-Za-z0-9_=&%\-.+]*$/', $v) ? $v : '';
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $accion = $_POST['accion'] ?? '';
 
     if ($accion === 'crear' || $accion === 'editar') {
-        $nombres = trim($_POST['nombres'] ?? '');
-        $apellidos = trim($_POST['apellidos'] ?? '');
+        $nombres = campo($_POST, 'nombres');
+        $apellidos = campo($_POST, 'apellidos');
         $grupo_id = (int) ($_POST['grupo_id'] ?? 0);
-        $nombre_encargado = trim($_POST['nombre_encargado'] ?? '') ?: null;
-        $telefono_encargado = trim($_POST['telefono_encargado'] ?? '') ?: null;
-        $observaciones = trim($_POST['observaciones'] ?? '') ?: null;
+        $nombre_encargado = campo($_POST, 'nombre_encargado') ?: null;
+        $telefono_encargado = campo($_POST, 'telefono_encargado') ?: null;
+        $observaciones = campo($_POST, 'observaciones') ?: null;
 
         if ($nombres === '' || $apellidos === '' || $grupo_id <= 0) {
             set_flash('error', 'Nombres, apellidos y grupo son obligatorios.');
@@ -45,15 +54,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     // Conserva el filtro/orden que el usuario tenía activo antes de crear/editar.
-    redirect('estudiantes.php' . ($_POST['volver_a'] ?? ''));
+    redirect('estudiantes.php' . volver_seguro());
 }
 
 $grupos = $pdo->query('SELECT * FROM grupos ORDER BY nombre')->fetchAll();
 
 $grupoFiltro = isset($_GET['grupo']) ? (int) $_GET['grupo'] : 0;
-$busqueda = trim($_GET['q'] ?? '');
-$sortCol = $_GET['sort'] ?? 'nombre';
-$sortDir = ($_GET['dir'] ?? 'asc') === 'desc' ? 'desc' : 'asc';
+$busqueda = campo($_GET, 'q');
+$sortCol = campo($_GET, 'sort', 'nombre');
+$sortDir = campo($_GET, 'dir', 'asc') === 'desc' ? 'desc' : 'asc';
 
 $sortColumns = [
     'nombre' => ['es.nombres', 'es.apellidos'],
@@ -107,7 +116,10 @@ require __DIR__ . '/includes/header.php';
 <div class="page-head">
     <h1>Catequizandos</h1>
     <?php if (!$editando): ?>
-    <button class="btn btn-primary" onclick="document.getElementById('form-nuevo').classList.toggle('hidden')">+ Nuevo catequizando</button>
+    <div class="actions-row">
+        <a class="btn" href="promocion.php">Pasar de grupo</a>
+        <button class="btn btn-primary" onclick="document.getElementById('form-nuevo').classList.toggle('hidden')">+ Nuevo catequizando</button>
+    </div>
     <?php endif; ?>
 </div>
 
@@ -163,6 +175,7 @@ require __DIR__ . '/includes/header.php';
     <label>Buscar <input type="text" name="q" value="<?= e($busqueda) ?>" placeholder="Nombre o apellido"></label>
     <button class="btn" type="submit">Filtrar</button>
     <a class="btn" href="estudiantes_export.php?<?= http_build_query(['grupo' => $grupoFiltro ?: '', 'q' => $busqueda]) ?>">📊 Exportar a Excel</a>
+    <?php if ($grupoFiltro): ?><a class="btn" href="boletin.php?grupo=<?= (int) $grupoFiltro ?>">🖨 Boletines del grupo</a><?php endif; ?>
 </form>
 
 <div class="card">
@@ -186,6 +199,7 @@ require __DIR__ . '/includes/header.php';
             <td><?= e($es['telefono_encargado']) ?></td>
             <td class="actions">
                 <a class="btn btn-small" href="estudiantes.php?editar=<?= (int) $es['id'] ?><?= $volverA ? '&' . http_build_query($volverA) : '' ?>">Editar</a>
+                <a class="btn btn-small" href="boletin.php?id=<?= (int) $es['id'] ?>">Boletín</a>
             </td>
         </tr>
         <?php endforeach; ?>

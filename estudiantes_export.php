@@ -5,7 +5,7 @@ require __DIR__ . '/includes/functions.php';
 require __DIR__ . '/includes/xlsx.php';
 
 $grupoFiltro = isset($_GET['grupo']) ? (int) $_GET['grupo'] : 0;
-$busqueda = trim($_GET['q'] ?? '');
+$busqueda = campo($_GET, 'q');
 
 $sql = "SELECT es.*, g.nombre AS grupo_nombre FROM estudiantes es JOIN grupos g ON g.id = es.grupo_id WHERE 1=1";
 $params = [];
